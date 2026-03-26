@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bible Reading Plan — Proverbs & Psalms (ASV)</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --color-background-primary: #ffffff;
+    --color-background-secondary: #f5f5f3;
+    --color-text-primary: #1a1a18;
+    --color-text-secondary: #6b6b65;
+    --color-text-tertiary: #9a9a93;
+    --color-border-tertiary: rgba(0,0,0,0.1);
+    --color-border-secondary: rgba(0,0,0,0.2);
+    --color-border-primary: rgba(0,0,0,0.35);
+    --font-sans: system-ui, -apple-system, sans-serif;
+    --border-radius-md: 8px;
+    --border-radius-lg: 12px;
+    --amber: #BA7517;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --color-background-primary: #1e1e1c;
+      --color-background-secondary: #2a2a28;
+      --color-text-primary: #f0ede6;
+      --color-text-secondary: #a0a099;
+      --color-text-tertiary: #6e6e68;
+      --color-border-tertiary: rgba(255,255,255,0.08);
+      --color-border-secondary: rgba(255,255,255,0.15);
+      --color-border-primary: rgba(255,255,255,0.28);
+    }
+  }
+  body {
+    font-family: var(--font-sans);
+    background: var(--color-background-secondary);
+    color: var(--color-text-primary);
+    min-height: 100vh;
+    padding: 2rem 1rem 4rem;
+  }
+  .wrapper {
+    max-width: 680px;
+    margin: 0 auto;
+  }
+  h1 {
+    font-size: 1.5rem;
+    font-weight: 500;
+    color: var(--color-text-primary);
+    margin-bottom: 4px;
+  }
+  .tagline {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    margin-bottom: 1.5rem;
+  }
+  .controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 1.25rem;
+  }
+  .controls label { font-size: 13px; color: var(--color-text-secondary); }
+  select {
+    font-size: 13px;
+    padding: 6px 10px;
+    border-radius: var(--border-radius-md);
+    border: 0.5px solid var(--color-border-secondary);
+    background: var(--color-background-primary);
+    color: var(--color-text-primary);
+  }
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 1.25rem;
+  }
+  .stat {
+    background: var(--color-background-primary);
+    border-radius: var(--border-radius-md);
+    padding: 12px 14px;
+    border: 0.5px solid var(--color-border-tertiary);
+  }
+  .stat-label { font-size: 12px; color: var(--color-text-secondary); margin-bottom: 4px; }
+  .stat-val { font-size: 20px; font-weight: 500; color: var(--color-text-primary); }
+  .progress-bar {
+    height: 5px;
+    border-radius: 99px;
+    background: var(--color-border-tertiary);
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    border-radius: 99px;
+    background: var(--amber);
+    transition: width 0.3s;
+  }
+  .day-grid { display: flex; flex-direction: column; gap: 6px; }
+  .day-row {
+    display: grid;
+    grid-template-columns: 32px 1fr 1fr 56px;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-radius: var(--border-radius-md);
+    border: 0.5px solid var(--color-border-tertiary);
+    background: var(--color-background-primary);
+    transition: background 0.15s;
+  }
+  .day-row.done {
+    background: var(--color-background-secondary);
+    border-color: transparent;
+  }
+  .day-num { font-size: 12px; color: var(--color-text-tertiary); font-weight: 500; text-align: center; }
+  .ref { font-size: 13px; color: var(--color-text-primary); }
+  .ref span { font-size: 11px; color: var(--color-text-secondary); display: block; margin-top: 1px; }
+  .day-row.done .ref { color: var(--color-text-secondary); }
+  .check-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 1.5px solid var(--color-border-secondary);
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.15s;
+    justify-self: end;
+  }
+  .check-btn:hover { border-color: var(--amber); }
+  .check-btn.checked { background: #BA7517; border-color: #BA7517; }
+  .check-icon {
+    width: 13px; height: 13px;
+    fill: none;
+    stroke: var(--color-text-tertiary);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .check-btn.checked .check-icon { stroke: white; }
+  .reset-btn {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    background: none;
+    border: 0.5px solid var(--color-border-tertiary);
+    border-radius: var(--border-radius-md);
+    padding: 5px 12px;
+    cursor: pointer;
+    margin-left: auto;
+  }
+  .reset-btn:hover { border-color: var(--color-border-primary); color: var(--color-text-primary); }
+  .month-label {
+    font-size: 11px;
+    color: var(--color-text-tertiary);
+    text-align: center;
+    padding: 4px 0;
+    letter-spacing: 0.06em;
+  }
+</style>
+</head>
+<body>
+<div class="wrapper">
+  <h1>Proverbs & Psalms Reading Plan</h1>
+  <p class="tagline">ASV · Monthly checklist · 1 Proverb/day + Psalms spread across the month</p>
+
+  <div class="controls">
+    <label>Month:</label>
+    <select id="monthSel" onchange="render()">
+      <option value="0">January</option><option value="1">February</option>
+      <option value="2">March</option><option value="3">April</option>
+      <option value="4">May</option><option value="5">June</option>
+      <option value="6">July</option><option value="7">August</option>
+      <option value="8">September</option><option value="9">October</option>
+      <option value="10">November</option><option value="11">December</option>
+    </select>
+    <label>Year:</label>
+    <select id="yearSel" onchange="render()">
+      <option value="2025">2025</option>
+      <option value="2026" selected>2026</option>
+      <option value="2027">2027</option>
+    </select>
+    <button class="reset-btn" onclick="resetMonth()">Reset month</button>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="stat-label">Days done</div><div class="stat-val" id="sDone">0</div></div>
+    <div class="stat"><div class="stat-label">Days left</div><div class="stat-val" id="sLeft">0</div></div>
+    <div class="stat"><div class="stat-label">Completed</div><div class="stat-val" id="sPct">0%</div></div>
+  </div>
+  <div class="progress-bar"><div class="progress-fill" id="pBar" style="width:0%"></div></div>
+
+  <div class="day-grid" id="grid"></div>
+</div>
+
+<script>
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const now = new Date();
+document.getElementById('monthSel').value = now.getMonth();
+
+function daysInMonth(m, y) { return new Date(y, m+1, 0).getDate(); }
+
+function buildPsalmsForMonth(days) {
+  const total = 150;
+  const perDay = [];
+  let psalm = 1;
+  for (let d = 0; d < days; d++) {
+    const remaining = days - d;
+    const psalmsLeft = total - psalm + 1;
+    const count = Math.round(psalmsLeft / remaining);
+    const end = Math.min(psalm + count - 1, 150);
+    perDay.push({ start: psalm, end });
+    psalm = end + 1;
+    if (psalm > 150) psalm = 150;
+  }
+  return perDay;
+}
+
+function storageKey(m, y) { return 'bplan_' + y + '_' + m; }
+
+function getChecked(m, y) {
+  try { return JSON.parse(localStorage.getItem(storageKey(m, y)) || '{}'); } catch { return {}; }
+}
+function saveChecked(m, y, data) {
+  try { localStorage.setItem(storageKey(m, y), JSON.stringify(data)); } catch {}
+}
+
+let checked = {};
+
+function render() {
+  const m = parseInt(document.getElementById('monthSel').value);
+  const y = parseInt(document.getElementById('yearSel').value);
+  const days = daysInMonth(m, y);
+  checked = getChecked(m, y);
+  const psalms = buildPsalmsForMonth(days);
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+
+  const label = document.createElement('div');
+  label.className = 'month-label';
+  label.textContent = MONTHS[m] + ' ' + y + ' — ASV';
+  grid.appendChild(label);
+
+  for (let d = 0; d < days; d++) {
+    const day = d + 1;
+    const isDone = !!checked[day];
+    const ps = psalms[d];
+    const psLabel = ps.start === ps.end ? 'Psalm ' + ps.start : 'Psalms ' + ps.start + '–' + ps.end;
+
+    const row = document.createElement('div');
+    row.className = 'day-row' + (isDone ? ' done' : '');
+    row.innerHTML =
+      '<div class="day-num">' + day + '</div>' +
+      '<div class="ref">Proverbs ' + day + '<span>Chapter ' + day + '</span></div>' +
+      '<div class="ref">' + psLabel + '<span>' + (ps.end - ps.start + 1) + ' chapter' + (ps.end - ps.start > 0 ? 's' : '') + '</span></div>' +
+      '<button class="check-btn' + (isDone ? ' checked' : '') + '" onclick="toggle(' + day + ',' + m + ',' + y + ')" title="Mark done">' +
+      '<svg class="check-icon" viewBox="0 0 16 16"><polyline points="3,8 6,12 13,4"/></svg>' +
+      '</button>';
+    grid.appendChild(row);
+  }
+  updateStats(days);
+}
+
+function toggle(day, m, y) {
+  checked[day] = !checked[day];
+  if (!checked[day]) delete checked[day];
+  saveChecked(m, y, checked);
+  render();
+}
+
+function resetMonth() {
+  const m = parseInt(document.getElementById('monthSel').value);
+  const y = parseInt(document.getElementById('yearSel').value);
+  checked = {};
+  saveChecked(m, y, {});
+  render();
+}
+
+function updateStats(days) {
+  const done = Object.values(checked).filter(Boolean).length;
+  const left = days - done;
+  const pct = Math.round((done / days) * 100);
+  document.getElementById('sDone').textContent = done;
+  document.getElementById('sLeft').textContent = left;
+  document.getElementById('sPct').textContent = pct + '%';
+  document.getElementById('pBar').style.width = pct + '%';
+}
+
+render();
+</script>
+</body>
+</html>
