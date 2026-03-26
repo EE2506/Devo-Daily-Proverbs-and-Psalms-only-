@@ -113,6 +113,9 @@
     background: var(--color-background-secondary);
     border-color: transparent;
   }
+  .day-row.today {
+    box-shadow: 0 0 0 2px rgba(186,117,23,0.08) inset, 0 6px 18px rgba(0,0,0,0.06);
+  }
   .day-num { font-size: 12px; color: var(--color-text-tertiary); font-weight: 500; text-align: center; }
   .ref { font-size: 13px; color: var(--color-text-primary); }
   .ref span { font-size: 11px; color: var(--color-text-secondary); display: block; margin-top: 1px; }
@@ -159,6 +162,14 @@
     padding: 4px 0;
     letter-spacing: 0.06em;
   }
+  .site-footer {
+    margin-top: 18px;
+    padding: 12px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--color-text-secondary);
+  }
+  .site-footer a { color: var(--amber); text-decoration: none; }
 </style>
 </head>
 <body>
@@ -182,7 +193,13 @@
       <option value="2026" selected>2026</option>
       <option value="2027">2027</option>
     </select>
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--color-text-secondary);">
+      <input id="autoScroll" type="checkbox" style="width:16px;height:16px;" /> Auto-scroll to today
+    </label>
     <button class="reset-btn" onclick="resetMonth()">Reset month</button>
+    <button class="reset-btn" onclick="exportMonth()" title="Export current month JSON">Export</button>
+    <label class="reset-btn" for="importFile" style="cursor:pointer;">Import</label>
+    <input id="importFile" type="file" accept="application/json" style="display:none" onchange="importMonth(event)">
   </div>
 
   <div class="stats">
@@ -193,6 +210,29 @@
   <div class="progress-bar"><div class="progress-fill" id="pBar" style="width:0%"></div></div>
 
   <div class="day-grid" id="grid"></div>
+  <div id="notePanel" style="position:fixed;left:50%;transform:translateX(-50%);bottom:18px;width:640px;max-width:94%;background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:10px;padding:10px 12px;display:none;box-shadow:0 8px 20px rgba(0,0,0,0.08);">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+      <div style="font-size:13px;color:var(--color-text-secondary);">Note for</div>
+      <div id="noteDate" style="font-weight:600"></div>
+      <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+        <button class="reset-btn" onclick="closeNote()">Close</button>
+      </div>
+    </div>
+    <textarea id="noteText" rows="4" style="width:100%;padding:8px;border-radius:8px;border:0.5px solid var(--color-border-tertiary);resize:vertical;background:var(--color-background-secondary);"></textarea>
+    <div style="display:flex;gap:8px;margin-top:8px;justify-content:flex-end;">
+      <button class="reset-btn" onclick="saveNote()">Save Note</button>
+      <button class="reset-btn" onclick="deleteNote()">Delete Note</button>
+    </div>
+  </div>
+  <div class="site-footer">
+    <div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:8px;">Matthew 28:18-20 ASV</div>
+    <div style="font-size:13px;color:var(--color-text-secondary);font-style:italic;line-height:1.25;margin-bottom:8px;">
+      18 And Jesus came to them and spake unto them, saying, All authority hath been given unto me in heaven and on earth. 
+      19 Go ye therefore, and make disciples of all the nations, baptizing them into the name of the Father and of the Son and of the Holy Spirit: 
+      20 teaching them to observe all things whatsoever I commanded you: and lo, I am with you always, even unto the end of the world.
+    </div>
+    <div>© 2026 <a href="https://github.com/EE2506" target="_blank" rel="noopener">EE2506</a> — Open source, free to use.</div>
+  </div>
 </div>
 
 <script>
@@ -220,20 +260,34 @@ function buildPsalmsForMonth(days) {
 
 function storageKey(m, y) { return 'bplan_' + y + '_' + m; }
 
-function getChecked(m, y) {
-  try { return JSON.parse(localStorage.getItem(storageKey(m, y)) || '{}'); } catch { return {}; }
-}
-function saveChecked(m, y, data) {
-  try { localStorage.setItem(storageKey(m, y), JSON.stringify(data)); } catch {}
+function getMonthData(m, y) {
+  try {
+    const raw = localStorage.getItem(storageKey(m, y));
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    const normalized = {};
+    for (const k in parsed) {
+      const val = parsed[k];
+      if (typeof val === 'boolean') normalized[k] = { done: val, note: '' };
+      else if (val && typeof val === 'object') normalized[k] = { done: !!val.done, note: val.note || '' };
+      else normalized[k] = { done: !!val, note: '' };
+    }
+    return normalized;
+  } catch (e) { return {}; }
 }
 
-let checked = {};
+function saveMonthData(m, y, data) {
+  try { localStorage.setItem(storageKey(m, y), JSON.stringify(data)); } catch (e) {}
+}
+
+let monthData = {};
+let selected = null;
 
 function render() {
   const m = parseInt(document.getElementById('monthSel').value);
   const y = parseInt(document.getElementById('yearSel').value);
   const days = daysInMonth(m, y);
-  checked = getChecked(m, y);
+  monthData = getMonthData(m, y);
   const psalms = buildPsalmsForMonth(days);
   const grid = document.getElementById('grid');
   grid.innerHTML = '';
@@ -245,12 +299,15 @@ function render() {
 
   for (let d = 0; d < days; d++) {
     const day = d + 1;
-    const isDone = !!checked[day];
+    const entry = monthData[day] || { done: false, note: '' };
+    const isDone = !!entry.done;
     const ps = psalms[d];
     const psLabel = ps.start === ps.end ? 'Psalm ' + ps.start : 'Psalms ' + ps.start + '–' + ps.end;
 
     const row = document.createElement('div');
     row.className = 'day-row' + (isDone ? ' done' : '');
+    row.dataset.day = day;
+    if (m === now.getMonth() && y === now.getFullYear() && day === now.getDate()) row.className += ' today';
     row.innerHTML =
       '<div class="day-num">' + day + '</div>' +
       '<div class="ref">Proverbs ' + day + '<span>Chapter ' + day + '</span></div>' +
@@ -258,34 +315,127 @@ function render() {
       '<button class="check-btn' + (isDone ? ' checked' : '') + '" onclick="toggle(' + day + ',' + m + ',' + y + ')" title="Mark done">' +
       '<svg class="check-icon" viewBox="0 0 16 16"><polyline points="3,8 6,12 13,4"/></svg>' +
       '</button>';
+    row.addEventListener('click', (ev) => {
+      if (ev.target.closest('.check-btn')) return;
+      openNote(day, m, y);
+    });
     grid.appendChild(row);
   }
+
   updateStats(days);
+  // Auto-scroll to today only when it's off-screen
+  if (parseInt(document.getElementById('monthSel').value) === now.getMonth() && parseInt(document.getElementById('yearSel').value) === now.getFullYear()) {
+    const auto = document.getElementById('autoScroll') && document.getElementById('autoScroll').checked;
+    if (auto) {
+      const todayEl = grid.querySelector('.day-row.today');
+      if (todayEl) {
+        const rect = todayEl.getBoundingClientRect();
+        if (rect.top < 0 || rect.bottom > window.innerHeight) {
+          todayEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+    }
+  }
 }
 
 function toggle(day, m, y) {
-  checked[day] = !checked[day];
-  if (!checked[day]) delete checked[day];
-  saveChecked(m, y, checked);
+  const entry = monthData[day] || { done: false, note: '' };
+  entry.done = !entry.done;
+  monthData[day] = entry;
+  // cleanup empty entries
+  if (!entry.done && !entry.note) delete monthData[day];
+  saveMonthData(m, y, monthData);
   render();
 }
 
 function resetMonth() {
   const m = parseInt(document.getElementById('monthSel').value);
   const y = parseInt(document.getElementById('yearSel').value);
-  checked = {};
-  saveChecked(m, y, {});
+  monthData = {};
+  saveMonthData(m, y, {});
   render();
 }
 
 function updateStats(days) {
-  const done = Object.values(checked).filter(Boolean).length;
+  const done = Object.values(monthData).filter(v => v && v.done).length;
   const left = days - done;
-  const pct = Math.round((done / days) * 100);
+  const pct = Math.round((done / days) * 100) || 0;
   document.getElementById('sDone').textContent = done;
   document.getElementById('sLeft').textContent = left;
   document.getElementById('sPct').textContent = pct + '%';
   document.getElementById('pBar').style.width = pct + '%';
+}
+
+function openNote(day, m, y) {
+  selected = { day, m, y };
+  const panel = document.getElementById('notePanel');
+  document.getElementById('noteDate').textContent = MONTHS[m] + ' ' + day + ', ' + y;
+  document.getElementById('noteText').value = (monthData[day] && monthData[day].note) || '';
+  panel.style.display = 'block';
+}
+
+function closeNote() { document.getElementById('notePanel').style.display = 'none'; selected = null; }
+
+function saveNote() {
+  if (!selected) return;
+  const text = document.getElementById('noteText').value.trim();
+  const entry = monthData[selected.day] || { done: false, note: '' };
+  entry.note = text;
+  monthData[selected.day] = entry;
+  // remove if empty
+  if (!entry.done && !entry.note) delete monthData[selected.day];
+  saveMonthData(selected.m, selected.y, monthData);
+  render();
+  closeNote();
+}
+
+function deleteNote() {
+  if (!selected) return;
+  const entry = monthData[selected.day];
+  if (entry) {
+    entry.note = '';
+    if (!entry.done) delete monthData[selected.day];
+    else monthData[selected.day] = entry;
+    saveMonthData(selected.m, selected.y, monthData);
+  }
+  render();
+  closeNote();
+}
+
+function exportMonth() {
+  const m = parseInt(document.getElementById('monthSel').value);
+  const y = parseInt(document.getElementById('yearSel').value);
+  const data = { meta: { month: m, year: y, exportedAt: new Date().toISOString() }, data: getMonthData(m, y) };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `bplan_${y}_${m}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function importMonth(ev) {
+  const file = ev.target.files && ev.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const parsed = JSON.parse(e.target.result);
+      const m = parseInt(document.getElementById('monthSel').value);
+      const y = parseInt(document.getElementById('yearSel').value);
+      // Support both {meta,data} exports or direct map
+      const payload = parsed.data || parsed;
+      saveMonthData(m, y, payload);
+      render();
+      alert('Imported to current month.');
+    } catch (err) { alert('Invalid JSON file'); }
+  };
+  reader.readAsText(file);
+  // clear input
+  ev.target.value = '';
 }
 
 render();
